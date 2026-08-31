@@ -1,0 +1,6 @@
+# Copy this file to Config/Local.make for machine-specific build defaults.
+# Config/Local.make is ignored by Git.
+
+# DEFAULT_PROXY_URL ?= http://127.0.0.1:10808
+# BUNDLE_ID ?= local.example.dsh.desktop
+# ARCHITECTURES ?= arm64 x86_64
