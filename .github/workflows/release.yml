@@ -23,10 +23,17 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Validate release secrets
+      - name: Select release signing mode
+        id: release_mode
         shell: bash
         run: |
           set -euo pipefail
+          if [[ -z "${SPARKLE_PRIVATE_KEY:-}" ]]; then
+            printf 'Missing required repository secret: SPARKLE_PRIVATE_KEY\n' >&2
+            exit 1
+          fi
+
+          configured=()
           missing=()
           for name in \
             APPLE_API_ISSUER_ID \
@@ -34,20 +41,29 @@ jobs:
             APPLE_API_PRIVATE_KEY \
             APPLE_SIGNING_IDENTITY \
             MACOS_CERTIFICATE_BASE64 \
-            MACOS_CERTIFICATE_PASSWORD \
-            SPARKLE_PRIVATE_KEY
+            MACOS_CERTIFICATE_PASSWORD
           do
             if [[ -z "${!name:-}" ]]; then
               missing+=("$name")
+            else
+              configured+=("$name")
             fi
           done
-          if (( ${#missing[@]} > 0 )); then
-            printf 'Missing required repository secrets: %s\n' "${missing[*]}" >&2
+
+          if (( ${#configured[@]} == 0 )); then
+            printf 'developer_id=false\n' >> "$GITHUB_OUTPUT"
+            printf 'release_mode=ad-hoc\n' >> "$GITHUB_OUTPUT"
+          elif (( ${#missing[@]} == 0 )); then
+            printf 'developer_id=true\n' >> "$GITHUB_OUTPUT"
+            printf 'release_mode=developer-id\n' >> "$GITHUB_OUTPUT"
+          else
+            printf 'Apple release credentials are only partially configured. Missing: %s\n' "${missing[*]}" >&2
             exit 1
           fi
 
       - name: Configure signing and notarization
         id: signing
+        if: steps.release_mode.outputs.developer_id == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -82,11 +98,15 @@ jobs:
 
           printf 'keychain_path=%s\n' "$keychain_path" >> "$GITHUB_OUTPUT"
 
-      - name: Build signed universal application
+      - name: Build universal application
         shell: bash
         run: |
           set -euo pipefail
-          CODE_SIGN_IDENTITY="$APPLE_SIGNING_IDENTITY" make dmg
+          code_sign_identity="-"
+          if [[ "${{ steps.release_mode.outputs.developer_id }}" == "true" ]]; then
+            code_sign_identity="$APPLE_SIGNING_IDENTITY"
+          fi
+          CODE_SIGN_IDENTITY="$code_sign_identity" make dmg
 
           built_version="$(plutil -extract CFBundleShortVersionString raw build/DSH.app/Contents/Info.plist)"
           tag_version="${GITHUB_REF_NAME#v}"
@@ -94,8 +114,10 @@ jobs:
             printf 'Tag %s does not match app version %s\n' "$GITHUB_REF_NAME" "$built_version" >&2
             exit 1
           fi
+          printf 'Release signing mode: %s\n' "${{ steps.release_mode.outputs.release_mode }}"
 
       - name: Notarize installer
+        if: steps.release_mode.outputs.developer_id == 'true'
         shell: bash
         run: |
           set -euo pipefail

@@ -87,11 +87,18 @@ DSH_DESKTOP_PROXY_URL="http://127.0.0.1:10808" build/DSH.app/Contents/MacOS/DSH
 
 ## 自动更新
 
-1.2.0 起内置 Sparkle 2，并从 GitHub Releases 的 `appcast.xml` 检查更新。更新归档使用 Ed25519 签名验证；正式分发版本还应使用 Developer ID 签名并通过 Apple 公证。
+1.2.0 起内置 Sparkle 2，并从 GitHub Releases 的 `appcast.xml` 检查更新。更新归档使用 Ed25519 签名验证。免费发布采用 ad-hoc 代码签名；如果未来配置 Developer ID，工作流会自动增加 Apple 签名和公证。
 
 从不含 Sparkle 的 1.1.0 升级到 1.2.0 时，需要手动覆盖安装一次。之后可从“DSH → 检查更新…”获取新版本。
 
-本地准备 Release 资源的顺序如下：
+免费模式下，本地准备 Release 资源：
+
+```bash
+make dmg
+make appcast
+```
+
+若已配置 Developer ID 和公证凭据，则改为：
 
 ```bash
 CODE_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" make dmg
@@ -101,13 +108,16 @@ make appcast
 
 `make appcast` 会把 DMG 和签名后的 `appcast.xml` 放入 `build/release/`。默认使用登录钥匙串中账号为 `BaronCyrus/dsh-desktop` 的 Sparkle 密钥，也可在 CI 中通过 `SPARKLE_PRIVATE_KEY` 提供私钥。
 
-推送与应用版本一致的标签（例如 `v1.2.0`）会运行 Release 工作流。仓库需配置：
+推送与应用版本一致的标签（例如 `v1.2.0`）会运行 Release 工作流。免费模式只需配置：
+
+- `SPARKLE_PRIVATE_KEY`
+
+以下 Apple 凭据全部属于可选项；只有六项全部存在时才启用 Developer ID 签名与公证：
 
 - `MACOS_CERTIFICATE_BASE64`、`MACOS_CERTIFICATE_PASSWORD`、`APPLE_SIGNING_IDENTITY`
 - `APPLE_API_KEY_ID`、`APPLE_API_ISSUER_ID`、`APPLE_API_PRIVATE_KEY`
-- `SPARKLE_PRIVATE_KEY`
 
-工作流会构建通用应用、签名 DMG、完成 Apple 公证、生成 appcast，并发布 GitHub Release。
+工作流始终构建通用应用、生成 Ed25519 签名的 appcast 并发布 GitHub Release。Apple 凭据不完整时会停止发布，避免意外混用签名模式。
 
 ## 生成安装包
 
@@ -117,7 +127,9 @@ make appcast
 make dmg
 ```
 
-产物位于 `build/DSH-<版本>.dmg`。若要让其他用户正常下载安装，需要 Apple Developer Program 的 Developer ID 筿名和 Apple 公证：
+产物位于 `build/DSH-<版本>.dmg`。免费版从 GitHub 下载后，首次启动需要前往“系统设置 → 隐私与安全性”，确认仍要打开。之后的应用内更新由 Sparkle Ed25519 签名验证。
+
+若要消除首次启动时的 Gatekeeper 手动放行步骤，则需要 Apple Developer Program 的 Developer ID 筿名和 Apple 公证：
 
 ```bash
 CODE_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" make dmg
