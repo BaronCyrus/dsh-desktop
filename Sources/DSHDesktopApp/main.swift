@@ -2,6 +2,7 @@ import AppKit
 import Darwin
 import DSHDesktopCore
 import Foundation
+import Sparkle
 import WebKit
 
 private var managedDSHChildPID: pid_t = 0
@@ -22,6 +23,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     private var statusTitle: NSTextField!
     private var statusDetail: NSTextField!
     private var retryButton: NSButton!
+    private lazy var updaterController = SPUStandardUpdaterController(
+        startingUpdater: true,
+        updaterDelegate: nil,
+        userDriverDelegate: nil
+    )
 
     private let networkSettingsStore = NetworkSettingsStore()
     private var networkSettings = NetworkSettings.unmanaged
@@ -115,6 +121,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
         mainMenu.addItem(appMenuItem)
         let appMenu = NSMenu()
         appMenu.addItem(withTitle: "关于 DSH", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+        let checkForUpdatesItem = NSMenuItem(
+            title: "检查更新…",
+            action: #selector(SPUStandardUpdaterController.checkForUpdates(_:)),
+            keyEquivalent: ""
+        )
+        checkForUpdatesItem.target = updaterController
+        appMenu.addItem(checkForUpdatesItem)
         appMenu.addItem(.separator())
         let networkSettingsItem = NSMenuItem(
             title: "网络设置…",

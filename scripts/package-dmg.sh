@@ -39,4 +39,8 @@ hdiutil create \
     -ov \
     "$DMG_PATH"
 
+if [[ "${CODE_SIGN_IDENTITY:--}" != "-" ]]; then
+    codesign --force --timestamp --sign "$CODE_SIGN_IDENTITY" "$DMG_PATH"
+fi
+
 print "Created $DMG_PATH"

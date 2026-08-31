@@ -21,9 +21,12 @@ else
     dmg_path=${dmg_candidates[1]}
 fi
 
-xcrun notarytool submit "$dmg_path" \
-    --keychain-profile "$NOTARY_KEYCHAIN_PROFILE" \
-    --wait
+notary_options=(--keychain-profile "$NOTARY_KEYCHAIN_PROFILE")
+if [[ -n "${NOTARY_KEYCHAIN_PATH:-}" ]]; then
+    notary_options+=(--keychain "$NOTARY_KEYCHAIN_PATH")
+fi
+
+xcrun notarytool submit "$dmg_path" "${notary_options[@]}" --wait
 xcrun stapler staple "$dmg_path"
 xcrun stapler validate "$dmg_path"
 

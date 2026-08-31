@@ -8,9 +8,10 @@ APP_DIR="$BUILD_DIR/DSH.app"
 INFO_PLIST="$APP_DIR/Contents/Info.plist"
 EXECUTABLE="$APP_DIR/Contents/MacOS/DSH"
 ICON="$APP_DIR/Contents/Resources/ApplicationIcon.icns"
+SPARKLE_FRAMEWORK="$APP_DIR/Contents/Frameworks/Sparkle.framework"
 VERIFY_DIR="$BUILD_DIR/verify-icon.iconset"
 
-for required in "$INFO_PLIST" "$EXECUTABLE" "$ICON"; do
+for required in "$INFO_PLIST" "$EXECUTABLE" "$ICON" "$SPARKLE_FRAMEWORK"; do
     if [[ ! -e "$required" ]]; then
         print -u2 "missing required app resource: $required"
         exit 1
@@ -18,7 +19,11 @@ for required in "$INFO_PLIST" "$EXECUTABLE" "$ICON"; do
 done
 
 plutil -lint "$INFO_PLIST"
+plutil -extract SUFeedURL raw "$INFO_PLIST" >/dev/null
+plutil -extract SUPublicEDKey raw "$INFO_PLIST" >/dev/null
 codesign --verify --deep --strict --verbose=2 "$APP_DIR"
+otool -L "$EXECUTABLE" | grep -q '@rpath/Sparkle.framework/Versions/B/Sparkle'
+otool -l "$EXECUTABLE" | grep -q '@executable_path/../Frameworks'
 
 if [[ -e "$VERIFY_DIR" ]]; then
     find "$VERIFY_DIR" -depth -delete

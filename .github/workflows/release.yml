@@ -1,0 +1,135 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-14
+    env:
+      APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+      APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+      APPLE_API_PRIVATE_KEY: ${{ secrets.APPLE_API_PRIVATE_KEY }}
+      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+      MACOS_CERTIFICATE_BASE64: ${{ secrets.MACOS_CERTIFICATE_BASE64 }}
+      MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+      SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Validate release secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=()
+          for name in \
+            APPLE_API_ISSUER_ID \
+            APPLE_API_KEY_ID \
+            APPLE_API_PRIVATE_KEY \
+            APPLE_SIGNING_IDENTITY \
+            MACOS_CERTIFICATE_BASE64 \
+            MACOS_CERTIFICATE_PASSWORD \
+            SPARKLE_PRIVATE_KEY
+          do
+            if [[ -z "${!name:-}" ]]; then
+              missing+=("$name")
+            fi
+          done
+          if (( ${#missing[@]} > 0 )); then
+            printf 'Missing required repository secrets: %s\n' "${missing[*]}" >&2
+            exit 1
+          fi
+
+      - name: Configure signing and notarization
+        id: signing
+        shell: bash
+        run: |
+          set -euo pipefail
+          keychain_path="$RUNNER_TEMP/dsh-signing.keychain-db"
+          keychain_password="$(uuidgen)$(uuidgen)"
+          certificate_path="$RUNNER_TEMP/developer-id.p12"
+          api_key_path="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY_ID}.p8"
+
+          printf '%s' "$MACOS_CERTIFICATE_BASE64" | base64 --decode > "$certificate_path"
+          printf '%s' "$APPLE_API_PRIVATE_KEY" > "$api_key_path"
+
+          security create-keychain -p "$keychain_password" "$keychain_path"
+          security set-keychain-settings -lut 21600 "$keychain_path"
+          security unlock-keychain -p "$keychain_password" "$keychain_path"
+          security import "$certificate_path" \
+            -k "$keychain_path" \
+            -P "$MACOS_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign \
+            -T /usr/bin/security
+          security set-key-partition-list \
+            -S apple-tool:,apple: \
+            -s \
+            -k "$keychain_password" \
+            "$keychain_path"
+          security default-keychain -s "$keychain_path"
+
+          xcrun notarytool store-credentials dsh-notary \
+            --key "$api_key_path" \
+            --key-id "$APPLE_API_KEY_ID" \
+            --issuer "$APPLE_API_ISSUER_ID" \
+            --keychain "$keychain_path"
+
+          printf 'keychain_path=%s\n' "$keychain_path" >> "$GITHUB_OUTPUT"
+
+      - name: Build signed universal application
+        shell: bash
+        run: |
+          set -euo pipefail
+          CODE_SIGN_IDENTITY="$APPLE_SIGNING_IDENTITY" make dmg
+
+          built_version="$(plutil -extract CFBundleShortVersionString raw build/DSH.app/Contents/Info.plist)"
+          tag_version="${GITHUB_REF_NAME#v}"
+          if [[ "$built_version" != "$tag_version" ]]; then
+            printf 'Tag %s does not match app version %s\n' "$GITHUB_REF_NAME" "$built_version" >&2
+            exit 1
+          fi
+
+      - name: Notarize installer
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          NOTARY_KEYCHAIN_PROFILE=dsh-notary \
+          NOTARY_KEYCHAIN_PATH="${{ steps.signing.outputs.keychain_path }}" \
+          DMG_PATH="$PWD/build/DSH-$version.dmg" \
+          make notarize
+
+      - name: Generate signed appcast
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          RELEASE_TAG="$GITHUB_REF_NAME" \
+          DMG_PATH="$PWD/build/DSH-$version.dmg" \
+          make appcast
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          gh release create "$GITHUB_REF_NAME" \
+            "build/release/DSH-$version.dmg" \
+            "build/release/appcast.xml" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "DSH Desktop $version" \
+            --notes-file "ReleaseNotes/$version.md" \
+            --verify-tag
+
+      - name: Remove temporary keychain
+        if: always() && steps.signing.outputs.keychain_path != ''
+        shell: bash
+        run: security delete-keychain "${{ steps.signing.outputs.keychain_path }}" || true

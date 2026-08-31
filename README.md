@@ -17,6 +17,7 @@
 - 使用动态空闲端口，避免 `EADDRINUSE`
 - 关闭应用时一并停止其启动的 DSH 子进程
 - 使用 macOS 持久化 WebKit Cookie
+- 可从“DSH → 检查更新…”安全检查、下载并安装新版本
 - 支持 Apple Silicon 与 Intel 通用二进制
 - 可生成可拖入“应用程序”目录的 DMG
 
@@ -84,6 +85,30 @@ DSH_DESKTOP_PROXY_URL="http://127.0.0.1:10808" build/DSH.app/Contents/MacOS/DSH
 
 代理只用于 DSH 的外部请求；`127.0.0.1`、`localhost` 和 `::1` 始终绕过代理。
 
+## 自动更新
+
+1.2.0 起内置 Sparkle 2，并从 GitHub Releases 的 `appcast.xml` 检查更新。更新归档使用 Ed25519 签名验证；正式分发版本还应使用 Developer ID 签名并通过 Apple 公证。
+
+从不含 Sparkle 的 1.1.0 升级到 1.2.0 时，需要手动覆盖安装一次。之后可从“DSH → 检查更新…”获取新版本。
+
+本地准备 Release 资源的顺序如下：
+
+```bash
+CODE_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" make dmg
+NOTARY_KEYCHAIN_PROFILE="dsh-notary" make notarize
+make appcast
+```
+
+`make appcast` 会把 DMG 和签名后的 `appcast.xml` 放入 `build/release/`。默认使用登录钥匙串中账号为 `BaronCyrus/dsh-desktop` 的 Sparkle 密钥，也可在 CI 中通过 `SPARKLE_PRIVATE_KEY` 提供私钥。
+
+推送与应用版本一致的标签（例如 `v1.2.0`）会运行 Release 工作流。仓库需配置：
+
+- `MACOS_CERTIFICATE_BASE64`、`MACOS_CERTIFICATE_PASSWORD`、`APPLE_SIGNING_IDENTITY`
+- `APPLE_API_KEY_ID`、`APPLE_API_ISSUER_ID`、`APPLE_API_PRIVATE_KEY`
+- `SPARKLE_PRIVATE_KEY`
+
+工作流会构建通用应用、签名 DMG、完成 Apple 公证、生成 appcast，并发布 GitHub Release。
+
 ## 生成安装包
 
 本地测试版使用临时签名：
@@ -105,8 +130,8 @@ NOTARY_KEYCHAIN_PROFILE="dsh-notary" make notarize
 
 | 参数 | 默认值 | 用途 |
 | --- | --- | --- |
-| `APP_VERSION` | `1.1.0` | 对外版本号 |
-| `BUILD_NUMBER` | `3` | 内部构建号 |
+| `APP_VERSION` | `1.2.0` | 对外版本号 |
+| `BUILD_NUMBER` | `4` | 内部构建号 |
 | `BUNDLE_ID` | `io.github.baroncyrus.dsh-desktop` | 应用标识 |
 | `ARCHITECTURES` | `arm64 x86_64` | 目标架构 |
 | `DEFAULT_PROXY_URL` | 空 | 可选的内置代理地址 |
@@ -123,17 +148,17 @@ Checks/                   不依赖测试框架的核心逻辑检查
 Assets/                   图标源文件
 Config/                   应用 Info.plist 模板
 Tools/                    矢量图标生成工具
+ReleaseNotes/             各版本更新说明
 scripts/                  构建、验证、DMG 与公证脚本
 ```
 
 ## 路线图
 
-- GitHub Releases 安装包与 Sparkle 自动更新
 - Windows 原生启动器
 - 统一的跨平台网络与 DSH 进程配置
 
 ## 许可证与第三方材料
 
-第三方声明见 `THIRD_PARTY_NOTICES.md`。`ThirdParty/DeepSeek-DSH-LICENSE.txt` 保留了上游 DSH 的 MIT 许可证文本。
+第三方声明见 `THIRD_PARTY_NOTICES.md`。`ThirdParty/` 中保留了上游 DSH 与 Sparkle 的许可证文本。
 
 本项目原创代码采用 MIT License，详见 `LICENSE`。第三方材料仍分别遵循其原始许可证；MIT 软件许可证本身不授予商标权。
