@@ -1,7 +1,7 @@
 -include Config/Local.make
 
-APP_VERSION ?= 1.2.0
-BUILD_NUMBER ?= 4
+APP_VERSION ?= 1.2.1
+BUILD_NUMBER ?= 5
 BUNDLE_ID ?= io.github.baroncyrus.dsh-desktop
 DEFAULT_PROXY_URL ?=
 ARCHITECTURES ?= arm64 x86_64

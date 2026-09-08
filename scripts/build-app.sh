@@ -14,8 +14,8 @@ ICON_PATH="$RESOURCES_DIR/ApplicationIcon.icns"
 SPARKLE_FRAMEWORK_SOURCE="$PROJECT_ROOT/.build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework"
 SPARKLE_FRAMEWORK="$FRAMEWORKS_DIR/Sparkle.framework"
 
-APP_VERSION=${APP_VERSION:-1.2.0}
-BUILD_NUMBER=${BUILD_NUMBER:-4}
+APP_VERSION=${APP_VERSION:-1.2.1}
+BUILD_NUMBER=${BUILD_NUMBER:-5}
 BUNDLE_ID=${BUNDLE_ID:-io.github.baroncyrus.dsh-desktop}
 DEFAULT_PROXY_URL=${DEFAULT_PROXY_URL:-}
 ARCHITECTURES=${ARCHITECTURES:-$(uname -m)}

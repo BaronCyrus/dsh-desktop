@@ -17,6 +17,7 @@
 - 使用动态空闲端口，避免 `EADDRINUSE`
 - 关闭应用时一并停止其启动的 DSH 子进程
 - 使用 macOS 持久化 WebKit Cookie
+- 支持通过原生文件选择器添加聊天附件，可单选或多选文件
 - 可从“DSH → 检查更新…”安全检查、下载并安装新版本
 - 支持 Apple Silicon 与 Intel 通用二进制
 - 可生成可拖入“应用程序”目录的 DMG
@@ -108,7 +109,7 @@ make appcast
 
 `make appcast` 会把 DMG 和签名后的 `appcast.xml` 放入 `build/release/`。默认使用登录钥匙串中账号为 `BaronCyrus/dsh-desktop` 的 Sparkle 密钥，也可在 CI 中通过 `SPARKLE_PRIVATE_KEY` 提供私钥。
 
-推送与应用版本一致的标签（例如 `v1.2.0`）会运行 Release 工作流。免费模式只需配置：
+推送与应用版本一致的标签（例如 `v1.2.1`）会运行 Release 工作流。免费模式只需配置：
 
 - `SPARKLE_PRIVATE_KEY`
 
@@ -142,8 +143,8 @@ NOTARY_KEYCHAIN_PROFILE="dsh-notary" make notarize
 
 | 参数 | 默认值 | 用途 |
 | --- | --- | --- |
-| `APP_VERSION` | `1.2.0` | 对外版本号 |
-| `BUILD_NUMBER` | `4` | 内部构建号 |
+| `APP_VERSION` | `1.2.1` | 对外版本号 |
+| `BUILD_NUMBER` | `5` | 内部构建号 |
 | `BUNDLE_ID` | `io.github.baroncyrus.dsh-desktop` | 应用标识 |
 | `ARCHITECTURES` | `arm64 x86_64` | 目标架构 |
 | `DEFAULT_PROXY_URL` | 空 | 可选的内置代理地址 |
